@@ -54,7 +54,10 @@ class UnicodeReplacementConverter(WordLevelConverter):
         Returns:
             str: The converted word.
         """
-        return "".join(f"\\u{ord(ch):04x}" for ch in word)
+        # A \u escape holds exactly four hex digits, so characters outside the Basic Multilingual
+        # Plane are written as their UTF-16 surrogate pair.
+        code_units = word.encode("utf-16-be")
+        return "".join(f"\\u{int.from_bytes(code_units[i : i + 2], 'big'):04x}" for i in range(0, len(code_units), 2))
 
     def join_words(self, words: list[str]) -> str:
         """

@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+import json
+
 import pytest
 
 from pyrit.converter import ConverterResult, UnicodeReplacementConverter
@@ -50,3 +52,10 @@ async def test_unicode_replacement_input_not_supported():
     converter = UnicodeReplacementConverter()
     with pytest.raises(ValueError):
         await converter.convert_async(prompt="hello", input_type="image_path")
+
+
+async def test_unicode_replacement_non_bmp_uses_surrogate_pairs():
+    converter = UnicodeReplacementConverter()
+    result = await converter.convert_async(prompt="hi \U0001f600", input_type="text")
+    assert result.output_text == "\\u0068\\u0069 \\ud83d\\ude00"
+    assert json.loads(f'"{result.output_text}"') == "hi \U0001f600"
