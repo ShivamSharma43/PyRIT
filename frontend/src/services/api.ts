@@ -14,6 +14,10 @@ import type {
   ConverterPreviewRequest,
   ConverterPreviewResponse,
   CreateConverterRequest,
+  CreateTechniqueRequest,
+  TechniqueInstance,
+  TechniqueListResponse,
+  TechniqueTypeResponse,
   CreateTargetRequest,
   InitializerSettingsResponse,
   ListRegisteredInitializersResponse,
@@ -24,6 +28,7 @@ import type {
   CreateAttackResponse,
   AttackSummary,
   AttackListResponse,
+  DatasetListResponse,
   ConversationMessagesResponse,
   AddMessageRequest,
   AddMessageResponse,
@@ -38,6 +43,7 @@ import type {
   RunScenarioRequest,
   ScenarioRunSizeEstimateResponse,
   ScenarioRunSizeEstimateRequest,
+  ScenarioDatasetLoadResponse,
   ScenarioRunSummary,
   ScenarioRunListResponse,
   ScenarioRunProgress,
@@ -255,6 +261,18 @@ export const targetsApi = {
   },
 }
 
+export const techniquesApi = {
+  listTechniques: async (limit = 50, cursor?: string): Promise<TechniqueListResponse> => {
+    const params: Record<string, string | number> = { limit }
+    if (cursor) params.cursor = cursor
+    return (await apiClient.get('/techniques', { params })).data
+  },
+  listTypes: async (): Promise<TechniqueTypeResponse> =>
+    (await apiClient.get('/techniques/types')).data,
+  createTechnique: async (request: CreateTechniqueRequest): Promise<TechniqueInstance> =>
+    (await apiClient.post('/techniques', request)).data,
+}
+
 export const convertersApi = {
   listConverterTypes: async (): Promise<ConverterTypeListResponse> => {
     const response = await apiClient.get('/converters/types')
@@ -463,6 +481,14 @@ export const labelsApi = {
 }
 
 export const scenariosApi = {
+  loadDatasets: async (
+    scenarioName: string, request: ScenarioRunSizeEstimateRequest,
+  ): Promise<ScenarioDatasetLoadResponse> => {
+    const response = await apiClient.post(
+      `/scenarios/catalog/${encodeURIComponent(scenarioName)}/datasets/load`, request, { timeout: 300_000 },
+    )
+    return response.data
+  },
   /**
    * Lists one page of the scenario catalog. Callers that need the full
    * catalog should follow `pagination.next_cursor` until `has_more` is false.
@@ -556,6 +582,23 @@ export const scenariosApi = {
 
   resumeRun: async (scenarioResultId: string): Promise<ScenarioRunSummary> => {
     const response = await apiClient.post(`/scenarios/runs/${encodeURIComponent(scenarioResultId)}/resume`)
+    return response.data
+  },
+}
+
+export const datasetsApi = {
+  /**
+   * Lists dataset summaries. Counts, modalities, and harm categories on the
+   * cards come from this payload; callers do not page seeds to compute them.
+   */
+  listDatasets: async (
+    { loaded_only }: { readonly loaded_only: boolean },
+    signal?: AbortSignal,
+  ): Promise<DatasetListResponse> => {
+    const response = await apiClient.get('/datasets', {
+      params: { loaded_only },
+      signal,
+    })
     return response.data
   },
 }

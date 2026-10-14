@@ -178,19 +178,24 @@ pyrit_shell = "pyrit.cli.pyrit_shell:main"
 addopts = [
     "--import-mode=importlib",
 ]
-pythonpath = ["."]
+pythonpath = [".", "tests"]
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 filterwarnings = [
     # Keep the in-repo suite on the scorable/expectation contract. Tests that cover the
     # shim itself opt back in with pytest.warns.
     "error:Scorer\\.score_async:DeprecationWarning",
+    # Rates come from pyrit.analytics; tests that cover the deprecated method opt back in with pytest.warns.
+    "error:ScenarioResult\\.objective_achieved_rate:DeprecationWarning",
     # Ordinary callers must use async memory; compatibility tests capture the warnings.
     "error:MemoryInterface\\.:DeprecationWarning",
     "error:MessageScorableResolver\\.resolve:DeprecationWarning",
 ]
 
 [tool.ty]
+[tool.ty.environment]
+extra-paths = ["tests"]
+
 [tool.ty.rules]
 all = "error"
 # Most rules under `all = "error"` are already clean for pyrit/. A few remain
