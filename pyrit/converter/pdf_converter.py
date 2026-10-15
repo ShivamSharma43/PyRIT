@@ -3,6 +3,7 @@
 
 import ast
 import hashlib
+import json
 import time
 from io import BytesIO
 from pathlib import Path
@@ -22,6 +23,9 @@ from pyrit.models import ComponentIdentifier, PromptDataType, SeedPrompt
 # stays hidden on a typical page.
 _GENERATED_TEXT_COLOR: tuple[int, int, int] = (0, 0, 0)
 _INJECTED_TEXT_COLOR: tuple[int, int, int] = (255, 255, 255)
+
+# Default row height in mm for generated PDFs. The identifier leaves the default out, so default hashes don't move.
+_DEFAULT_ROW_HEIGHT = 10
 
 
 class PDFConverter(Converter):
@@ -52,7 +56,7 @@ class PDFConverter(Converter):
         page_width: int = 210,
         page_height: int = 297,
         column_width: int = 0,
-        row_height: int = 10,
+        row_height: int = _DEFAULT_ROW_HEIGHT,
         existing_pdf: Path | None = None,
         injection_items: list[dict[str, Any]] | None = None,
     ) -> None:
@@ -130,6 +134,12 @@ class PDFConverter(Converter):
         if self._existing_pdf_path:
             existing_pdf_path = str(self._existing_pdf_path)
 
+        injection_items_hash = None
+        if self._injection_items:
+            injection_items_hash = hashlib.sha256(
+                json.dumps(self._injection_items, sort_keys=True, default=str).encode("utf-8")
+            ).hexdigest()[:16]
+
         return self._create_identifier(
             params={
                 "font_type": self._font_type,
@@ -139,6 +149,11 @@ class PDFConverter(Converter):
                 "prompt_template_hash": template_hash,
                 "existing_pdf_path": existing_pdf_path,
                 "font_color": list(self._font_color) if self._font_color is not None else None,
+                # Layout and injection settings join the identity only when they are set, so the
+                # default identity keeps its existing hash.
+                "column_width": self._column_width or None,
+                "row_height": self._row_height if self._row_height != _DEFAULT_ROW_HEIGHT else None,
+                "injection_items_hash": injection_items_hash,
             }
         )
 

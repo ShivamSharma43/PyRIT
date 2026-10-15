@@ -16,6 +16,7 @@ from reportlab.pdfgen import canvas
 from pyrit.converter import ConverterResult, PDFConverter
 from pyrit.memory import DataTypeSerializer
 from pyrit.models import SeedPrompt
+from pyrit.registry import ConverterRegistry
 
 
 @pytest.mark.usefixtures("patch_central_database")
@@ -646,6 +647,45 @@ def test_identifier_distinguishes_font_color() -> None:
     assert "font_color" not in default.params
     assert red.params["font_color"] == [255, 0, 0]
     assert len({default.hash, red.hash, white.hash}) == 3
+
+
+@pytest.mark.usefixtures("patch_central_database")
+def test_identifier_distinguishes_layout() -> None:
+    default = PDFConverter().get_identifier()
+    narrow = PDFConverter(column_width=80).get_identifier()
+    tall = PDFConverter(row_height=20).get_identifier()
+    auto_height = PDFConverter(row_height=0).get_identifier()
+
+    assert "column_width" not in default.params
+    assert "row_height" not in default.params
+    assert narrow.params["column_width"] == 80
+    assert tall.params["row_height"] == 20
+    assert auto_height.params["row_height"] == 0
+    assert len({default.hash, narrow.hash, tall.hash, auto_height.hash}) == 4
+
+
+@pytest.mark.usefixtures("patch_central_database")
+def test_identifier_distinguishes_injection_items(mock_pdf_path: Path) -> None:
+    def injecting(text: str) -> PDFConverter:
+        return PDFConverter(existing_pdf=mock_pdf_path, injection_items=[{"page": 0, "x": 50, "y": 700, "text": text}])
+
+    first = injecting("first payload")
+    second = injecting("second payload")
+
+    assert "injection_items_hash" not in PDFConverter(existing_pdf=mock_pdf_path).get_identifier().params
+    assert first.get_identifier().hash != second.get_identifier().hash
+    assert injecting("first payload").get_identifier().hash == first.get_identifier().hash
+
+    # Both configurations get their own default registry name instead of colliding.
+    instances = ConverterRegistry().instances
+    instances.register(first)
+    instances.register(second)
+    assert instances.get(second.get_identifier().unique_name) is second
+
+
+@pytest.mark.usefixtures("patch_central_database")
+def test_identifier_keeps_default_hash() -> None:
+    assert PDFConverter().get_identifier().hash == "a05b4cf1482efac3adbc73fd088af40021f1ec3e8f08da575101410595aacf96"
 
 
 @pytest.mark.usefixtures("patch_central_database")
