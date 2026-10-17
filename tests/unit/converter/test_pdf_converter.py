@@ -684,6 +684,45 @@ def test_identifier_distinguishes_injection_items(mock_pdf_path: Path) -> None:
 
 
 @pytest.mark.usefixtures("patch_central_database")
+@pytest.mark.parametrize("text", ["hello", "caf\u00e9"])
+async def test_identifier_normalizes_injected_byte_text_async(*, mock_pdf_path: Path, text: str) -> None:
+    byte_text = text.encode("utf-8")
+    converters = [
+        PDFConverter(existing_pdf=mock_pdf_path, injection_items=[{"text": value}])
+        for value in (byte_text, text, str(byte_text))
+    ]
+    identifiers = [converter.get_identifier() for converter in converters]
+
+    assert identifiers[0].hash == identifiers[1].hash
+    assert identifiers[0].hash != identifiers[2].hash
+
+    instances = ConverterRegistry().instances
+    instances.register(converters[0])
+    instances.register(converters[2])
+    assert instances.get(identifiers[2].unique_name) is converters[2]
+
+    for converter, expected in zip(converters, (text, text, str(byte_text)), strict=True):
+        result = await converter.convert_async(prompt="")
+        assert PdfReader(result.output_text).pages[0].extract_text() == f"Page 1 content\n{expected}\n"
+
+
+@pytest.mark.usefixtures("patch_central_database")
+def test_identifier_rejects_unsupported_injection_values() -> None:
+    converter = PDFConverter(injection_items=[{"text": object()}])
+
+    with pytest.raises(TypeError, match="Unsupported injection item value type: object"):
+        converter.get_identifier()
+
+
+@pytest.mark.usefixtures("patch_central_database")
+def test_identifier_rejects_invalid_utf8_injection_text() -> None:
+    converter = PDFConverter(injection_items=[{"text": b"\xff"}])
+
+    with pytest.raises(UnicodeDecodeError):
+        converter.get_identifier()
+
+
+@pytest.mark.usefixtures("patch_central_database")
 def test_identifier_keeps_default_hash() -> None:
     assert PDFConverter().get_identifier().hash == "a05b4cf1482efac3adbc73fd088af40021f1ec3e8f08da575101410595aacf96"
 

@@ -75,7 +75,8 @@ class PDFConverter(Converter):
             column_width (int): Width of each column in the PDF. Defaults to 0 (full page width).
             row_height (int): Height of each row in the PDF. Defaults to 10.
             existing_pdf (Path | None, optional): Path to an existing PDF file. Defaults to None.
-            injection_items (list[Dict] | None, optional): A list of injection items for modifying an existing PDF.
+            injection_items (list[dict[str, Any]] | None, optional): Injection items for modifying an existing PDF.
+                Identifier values must be JSON-serializable or UTF-8 bytes, which are identified as their decoded text.
 
         Raises:
             ValueError: If the font color is invalid or the injection items are not provided as a list of dictionaries.
@@ -137,7 +138,9 @@ class PDFConverter(Converter):
         injection_items_hash = None
         if self._injection_items:
             injection_items_hash = hashlib.sha256(
-                json.dumps(self._injection_items, sort_keys=True, default=str).encode("utf-8")
+                json.dumps(self._injection_items, sort_keys=True, default=self._serialize_injection_value).encode(
+                    "utf-8"
+                )
             ).hexdigest()[:16]
 
         return self._create_identifier(
@@ -476,3 +479,22 @@ class PDFConverter(Converter):
         )
         await pdf_serializer.save_data_async(pdf_bytes, output_filename=output_filename)
         return pdf_serializer
+
+    @staticmethod
+    def _serialize_injection_value(value: object) -> str:
+        """
+        Normalize byte text consistently with ReportLab for identifier serialization.
+
+        Args:
+            value (object): A value not handled by the JSON encoder.
+
+        Returns:
+            str: The decoded UTF-8 text.
+
+        Raises:
+            TypeError: If the value is not bytes.
+            UnicodeDecodeError: If the bytes are not valid UTF-8.
+        """
+        if isinstance(value, bytes):
+            return value.decode("utf-8")
+        raise TypeError(f"Unsupported injection item value type: {type(value).__name__}")
