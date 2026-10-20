@@ -71,6 +71,28 @@ def test_init_filter_path_custom_yaml(mock_target, tmp_path) -> None:
     assert "my_variation" in converter._variation_map
 
 
+def test_identifier_distinguishes_custom_filters_with_the_same_file_name(mock_target, tmp_path) -> None:
+    contents = {
+        "charcoal": "style_instructions: charcoal sketch\nvariations:\n  close_up: tight framing\n",
+        "neon": "style_instructions: neon cyberpunk\nvariations:\n  close_up: tight framing\n",
+        "charcoal_copy": "style_instructions: charcoal sketch\nvariations:\n  close_up: tight framing\n",
+    }
+    converters = {}
+    for folder, content in contents.items():
+        (tmp_path / folder).mkdir()
+        filter_file = tmp_path / folder / "gritty_documentary.yaml"
+        filter_file.write_text(content)
+        converters[folder] = ImagePromptStyleConverter(converter_target=mock_target, filter_path=filter_file)
+    built_in = ImagePromptStyleConverter(converter_target=mock_target, filter_name="gritty_documentary")
+
+    hashes = {name: converter.get_identifier().hash for name, converter in converters.items()}
+    assert hashes["charcoal"] != hashes["neon"]
+    assert hashes["charcoal"] == hashes["charcoal_copy"]
+    assert hashes["charcoal"] != built_in.get_identifier().hash
+    assert converters["charcoal"].get_identifier().params["filter_name"] == "gritty_documentary"
+    assert built_in.get_identifier().params.get("filter_hash") is None
+
+
 def test_init_filter_path_nonexistent_raises(mock_target) -> None:
     with pytest.raises(ValueError, match="does not exist"):
         ImagePromptStyleConverter(
