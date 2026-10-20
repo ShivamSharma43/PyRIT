@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -338,3 +339,33 @@ def test_llm_converter_identifier_includes_custom_prompt_template(
     assert custom.get_identifier().hash == same_custom.get_identifier().hash
     for key, value in kwargs.items():
         assert custom_params[key] == value
+
+
+def test_generic_llm_converter_identifier_includes_template_parameters(mock_target) -> None:
+    template = _custom_template("Translate the text into {{ language }}.", "language")
+
+    french = LLMGenericTextConverter(converter_target=mock_target, system_prompt_template=template, language="French")
+    spanish = LLMGenericTextConverter(converter_target=mock_target, system_prompt_template=template, language="Spanish")
+    same_french = LLMGenericTextConverter(
+        converter_target=mock_target, system_prompt_template=template, language="French"
+    )
+    no_parameters = LLMGenericTextConverter(converter_target=mock_target, system_prompt_template=template)
+
+    assert french.get_identifier().params["template_parameters"] == {"language": "French"}
+    assert french.get_identifier().hash != spanish.get_identifier().hash
+    assert french.get_identifier().hash == same_french.get_identifier().hash
+    assert no_parameters.get_identifier().params.get("template_parameters") is None
+
+
+def test_generic_llm_converter_identifier_template_parameters_are_json_values(mock_target) -> None:
+    converter = LLMGenericTextConverter(
+        converter_target=mock_target,
+        user_prompt_template_with_objective=_custom_template("{{ objective }} {{ words }} {{ path }}", "objective"),
+        words=("alpha", "beta"),
+        path=Path("styles") / "noir.yaml",
+    )
+
+    assert converter.get_identifier().params["template_parameters"] == {
+        "path": str(Path("styles") / "noir.yaml"),
+        "words": ["alpha", "beta"],
+    }

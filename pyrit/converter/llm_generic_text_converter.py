@@ -2,6 +2,7 @@
 # Licensed under the MIT license.
 
 import hashlib
+import json
 import logging
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -124,10 +125,15 @@ class LLMGenericTextConverter(Converter):
                 str(self._user_prompt_template_with_objective.value).encode("utf-8")
             ).hexdigest()[:16]
 
+        # Template parameters are rendered into both prompts, so they change what is sent.
+        # Round-trip through JSON so tuples become lists and other values their string form.
+        template_parameters = json.loads(json.dumps(self._prompt_kwargs, sort_keys=True, default=str)) or None
+
         return self._create_identifier(
             params={
                 "system_prompt_template_hash": system_prompt_hash,
                 "user_prompt_template_hash": user_prompt_hash,
+                "template_parameters": template_parameters,
             },
             converter_target=self._converter_target.get_identifier(),
         )
