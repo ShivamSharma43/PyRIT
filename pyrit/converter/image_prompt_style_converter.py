@@ -109,8 +109,10 @@ class ImagePromptStyleConverter(LLMGenericTextConverter):
         # filter can share, so identify it by its content. Built-in filters keep their name only.
         self._filter_hash: str | None = None
         if filter_path is not None:
+            # Variation order affects seeded selection and case-insensitive duplicate resolution.
             filter_content = json.dumps(
-                {"style_instructions": self._style_instructions, "variations": self._variations}, sort_keys=True
+                {"style_instructions": self._style_instructions, "variations": list(self._variations.items())},
+                sort_keys=True,
             )
             self._filter_hash = hashlib.sha256(filter_content.encode("utf-8")).hexdigest()[:16]
 
