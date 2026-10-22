@@ -79,8 +79,8 @@ class OpenAITTSTarget(OpenAITarget):
         if speed is not None and (
             not isinstance(speed, (int, float))
             or isinstance(speed, bool)
-            or not math.isfinite(speed)
             or not _MIN_SPEED <= speed <= _MAX_SPEED
+            or not math.isfinite(speed)
         ):
             raise ValueError(f"speed must be a finite number from {_MIN_SPEED} to {_MAX_SPEED}, got {speed!r}")
 
