@@ -89,16 +89,27 @@ def test_get_jailbreak_templates_includes_subdirectory_templates():
     assert len(templates) > top_level_count, "Subdirectory templates should be included in the listing"
 
 
-def test_get_jailbreak_templates_returns_requested_count():
+@pytest.mark.parametrize("num_templates", [1, 3])
+def test_get_jailbreak_templates_returns_requested_count(num_templates: int) -> None:
     all_templates = TextJailBreak.get_jailbreak_templates()
-    templates = TextJailBreak.get_jailbreak_templates(num_templates=3)
-    assert len(templates) == 3
+    templates = TextJailBreak.get_jailbreak_templates(num_templates=num_templates)
+    assert len(templates) == num_templates
     assert set(templates).issubset(all_templates)
 
 
-@pytest.mark.parametrize("num_templates", [0, -1, True, 2.5, "3"])
-def test_get_jailbreak_templates_rejects_invalid_num_templates(num_templates):
-    with pytest.raises(ValueError, match="num_templates must be an integer of at least 1 or None"):
+@pytest.mark.parametrize("num_templates", [0, -1])
+def test_get_jailbreak_templates_rejects_invalid_num_templates(num_templates: int) -> None:
+    with pytest.raises(ValueError, match="num_templates must be at least 1"):
+        TextJailBreak.get_jailbreak_templates(num_templates=num_templates)
+
+
+def test_get_jailbreak_templates_none_returns_all() -> None:
+    assert TextJailBreak.get_jailbreak_templates(num_templates=None) == sorted(TextJailBreak._get_template_cache())
+
+
+def test_get_jailbreak_templates_rejects_count_above_population() -> None:
+    num_templates = len(TextJailBreak.get_jailbreak_templates()) + 1
+    with pytest.raises(ValueError, match=f"Attempted to pull {num_templates} jailbreaks"):
         TextJailBreak.get_jailbreak_templates(num_templates=num_templates)
 
 

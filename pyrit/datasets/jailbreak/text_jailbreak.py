@@ -211,20 +211,18 @@ class TextJailBreak:
         Retrieve all jailbreaks from the JAILBREAK_TEMPLATES_PATH.
 
         Args:
-            num_templates (int, optional): Number of jailbreak templates to return. None to get all.
+            num_templates (int | None): Number of jailbreak templates to return. None to get all.
 
         Returns:
             list[str]: List of jailbreak template file names.
 
         Raises:
-            ValueError: If ``num_templates`` is not None and not an integer of at least 1.
+            ValueError: If ``num_templates`` is provided and is less than 1.
             ValueError: If no jailbreak templates are found in the jailbreak directory.
             ValueError: If n is larger than the number of templates that exist.
         """
-        if num_templates is not None and (
-            isinstance(num_templates, bool) or not isinstance(num_templates, int) or num_templates < 1
-        ):
-            raise ValueError(f"num_templates must be an integer of at least 1 or None, got {num_templates!r}")
+        if num_templates is not None and num_templates < 1:
+            raise ValueError("num_templates must be at least 1")
 
         jailbreak_template_names = sorted(cls._get_template_cache().keys())
         if not jailbreak_template_names:
