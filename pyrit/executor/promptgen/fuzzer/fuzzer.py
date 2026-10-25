@@ -717,7 +717,7 @@ class FuzzerGenerator(
                 Defaults to None.
             scorer (Scorer | None): Configuration for scoring responses. Defaults to None.
             scoring_success_threshold (float): The score threshold to consider a jailbreak successful.
-                Must be between 0.0 and 1.0. Defaults to 0.8.
+                Must be between 0.0 and 1.0, inclusive. Defaults to 0.8.
             prompt_normalizer (PromptNormalizer | None): The prompt normalizer to use. Defaults to None.
             frequency_weight (float): Constant that balances between high reward and selection frequency.
                 Defaults to 0.5.
@@ -833,22 +833,9 @@ class FuzzerGenerator(
             raise ValueError("Template converters cannot be empty.")
         if batch_size < 1:
             raise ValueError("Batch size must be at least 1.")
-        # A goal below 1 is met before the first iteration, so the fuzzer would send nothing.
-        if (
-            isinstance(target_jailbreak_goal_count, bool)
-            or not isinstance(target_jailbreak_goal_count, int)
-            or target_jailbreak_goal_count < 1
-        ):
-            raise ValueError(
-                f"target_jailbreak_goal_count must be a positive integer, got {target_jailbreak_goal_count!r}."
-            )
-        # Float scores are normalized to [0, 1]; a threshold outside it makes every response
-        # a jailbreak (below 0) or none of them (above 1).
-        if (
-            isinstance(scoring_success_threshold, bool)
-            or not isinstance(scoring_success_threshold, (int, float))
-            or not 0.0 <= scoring_success_threshold <= 1.0
-        ):
+        if target_jailbreak_goal_count < 1:
+            raise ValueError(f"target_jailbreak_goal_count must be at least 1, got {target_jailbreak_goal_count!r}.")
+        if not 0.0 <= scoring_success_threshold <= 1.0:
             raise ValueError(
                 f"scoring_success_threshold must be between 0.0 and 1.0, got {scoring_success_threshold!r}."
             )

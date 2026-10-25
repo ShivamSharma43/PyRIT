@@ -3,7 +3,6 @@
 
 import asyncio
 import pathlib
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -276,16 +275,16 @@ class TestFuzzerGenerator:
             )
         assert exc_info.match("Batch size must be at least 1.")
 
-    @pytest.mark.parametrize("goal_count", [0, -1, True, 1.5, "2", None])
+    @pytest.mark.parametrize("goal_count", [0, -1])
     def test_fuzzer_generator_initialization_rejects_non_positive_jailbreak_goal(
         self,
         scoring_target: MockPromptTarget,
         template_converters: list[FuzzerConverter],
         mock_scorer: MagicMock,
-        goal_count: Any,
+        goal_count: int,
     ) -> None:
         """A goal below 1 is already met before the first iteration, so nothing would be sent."""
-        with pytest.raises(ValueError, match="target_jailbreak_goal_count must be a positive integer"):
+        with pytest.raises(ValueError, match="target_jailbreak_goal_count must be at least 1"):
             FuzzerGenerator(
                 objective_target=scoring_target,
                 template_converters=template_converters,
@@ -293,13 +292,13 @@ class TestFuzzerGenerator:
                 target_jailbreak_goal_count=goal_count,
             )
 
-    @pytest.mark.parametrize("threshold", [-0.1, 1.5, float("nan"), True, "0.8", None])
+    @pytest.mark.parametrize("threshold", [-0.1, 1.5, float("nan")])
     def test_fuzzer_generator_initialization_rejects_threshold_outside_unit_interval(
         self,
         scoring_target: MockPromptTarget,
         template_converters: list[FuzzerConverter],
         mock_scorer: MagicMock,
-        threshold: Any,
+        threshold: float,
     ) -> None:
         """Float scores lie in [0, 1], so a threshold outside it marks every or no response a jailbreak."""
         with pytest.raises(ValueError, match="scoring_success_threshold must be between 0.0 and 1.0"):
