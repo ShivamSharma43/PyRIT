@@ -4,6 +4,9 @@
 import hashlib
 import logging
 import uuid
+from collections import defaultdict
+from dataclasses import fields, is_dataclass
+from inspect import isroutine
 from pathlib import PurePath
 from typing import TYPE_CHECKING, Any
 
@@ -33,40 +36,41 @@ def _describe_template_value(value: Any, *, enclosing: frozenset[int] = frozense
     """
     Describe a template parameter value so that values which render differently are told apart.
 
-    The description keeps container types and dictionary order (a Jinja loop renders entries in
-    insertion order) and never raises, so any value the renderer accepts can be identified. Values
-    without a dedicated case are described by their ``repr``.
+    The description keeps container types, iteration order, path flavor, dataclass fields and
+    instance attributes. These can all affect Jinja rendering even when values compare equal
+    or have the same ``repr``. Opaque values without structural state use their ``repr``.
 
     Args:
         value (Any): The template parameter value.
         enclosing (frozenset[int]): Ids of the containers being described, to stop at self-references.
 
     Returns:
-        str: A deterministic description of the value, tagged with its type.
+        str: A description of the value's rendering-relevant state, tagged with its type.
     """
     type_name = f"{type(value).__module__}.{type(value).__qualname__}"
-    try:
-        if id(value) in enclosing:
-            return f"{type_name}(<recursive>)"
-        nested = enclosing | {id(value)}
+    if id(value) in enclosing:
+        return f"{type_name}(<recursive>)"
+    nested = enclosing | {id(value)}
 
-        def describe(item: Any) -> str:
-            return _describe_template_value(item, enclosing=nested)
+    def describe(item: Any) -> str:
+        return _describe_template_value(item, enclosing=nested)
 
-        if isinstance(value, dict):
-            entries = ", ".join(f"{describe(key)}: {describe(item)}" for key, item in value.items())
-            return f"{type_name}{{{entries}}}"
-        if isinstance(value, (list, tuple)):
-            return f"{type_name}[{', '.join(describe(item) for item in value)}]"
-        if isinstance(value, (set, frozenset)):
-            # Set iteration order can change between processes, so sort the element descriptions.
-            return f"{type_name}{{{', '.join(sorted(describe(item) for item in value))}}}"
-        if isinstance(value, PurePath):
-            # Describe paths the same way on every platform (WindowsPath and PosixPath differ in repr).
-            return f"path({value.as_posix()!r})"
-        return f"{type_name}({value!r})"
-    except Exception:
-        return f"{type_name}(<unrepresentable>)"
+    attributes = getattr(value, "__dict__", None)
+    state = f"(attributes={describe(attributes)})" if isinstance(attributes, dict) else ""
+    if is_dataclass(value) and not isinstance(value, type):
+        entries = ", ".join(f"{item.name!r}: {describe(getattr(value, item.name))}" for item in fields(value))
+        return f"{type_name}{state}{{{entries}}}"
+    if isinstance(value, dict):
+        entries = ", ".join(f"{describe(key)}: {describe(item)}" for key, item in value.items())
+        factory = f"(default_factory={describe(value.default_factory)})" if isinstance(value, defaultdict) else ""
+        return f"{type_name}{state}{factory}{{{entries}}}"
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return f"{type_name}{state}[{', '.join(describe(item) for item in value)}]"
+    if isinstance(value, PurePath):
+        return f"{type_name}({str(value)!r})"
+    if state and not isinstance(value, (str, bytes, int, float, complex)) and not isroutine(value):
+        return f"{type_name}{state}"
+    return f"{type_name}{state}({value!r})"
 
 
 def _hash_template_parameters(parameters: dict[str, Any]) -> str | None:
@@ -141,7 +145,9 @@ class LLMGenericTextConverter(Converter):
                 between retry attempts. If ``None``, no wait is applied between attempts (matches
                 ``pyrit_json_retry``).
             kwargs: Additional parameters forwarded to both the system prompt and user prompt templates
-                during rendering.
+                during rendering. Their constructor-time state contributes to the identifier, including
+                container iteration order, path flavor and object fields. Parameters should remain static
+                after construction.
 
         Raises:
             ValueError: If converter_target is not provided and no default has been configured.
